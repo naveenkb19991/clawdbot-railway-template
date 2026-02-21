@@ -52,8 +52,14 @@ RUN apt-get update \
     python3-venv \
     gpg \
     curl \
+    fd-find \
     jq \
+    ripgrep \
     tmux \
+    tree \
+    wget \
+    zip \
+    unzip \
   && mkdir -p /etc/apt/keyrings \
   && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     | gpg --dearmor -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
