@@ -47,12 +47,14 @@ RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates \
     tini \
+    nginx \
     python3 \
     python3-pip \
     python3-venv \
     gpg \
     curl \
     fd-find \
+    gettext-base \
     jq \
     ripgrep \
     tmux \
@@ -75,6 +77,20 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/b
 # Install OpenCode CLI (installs to /root/.opencode/bin, add to PATH explicitly)
 RUN curl -fsSL https://opencode.ai/install | bash
 ENV PATH="/root/.opencode/bin:${PATH}"
+
+# Install zoxide (smart cd) and enable it in bash
+RUN curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh \
+  && ln -sf /root/.local/bin/zoxide /usr/local/bin/zoxide \
+  && printf '%s\n' \
+    'export PATH="/data/venv/bin:/data/npm/bin:/data/pnpm:$PATH"' \
+    'eval "$(zoxide init bash)"' \
+    >> /root/.bashrc
+
+# Install code-server (standalone tarball)
+ARG CODE_SERVER_VERSION=4.96.4
+RUN curl -fsSL "https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server-${CODE_SERVER_VERSION}-linux-amd64.tar.gz" \
+  | tar -xz -C /usr/local/lib \
+  && ln -s "/usr/local/lib/code-server-${CODE_SERVER_VERSION}-linux-amd64/bin/code-server" /usr/local/bin/code-server
 
 # `openclaw update` expects pnpm. Provide it in the runtime image.
 RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
@@ -105,6 +121,8 @@ RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"'
   && chmod +x /usr/local/bin/openclaw
 
 COPY src ./src
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
+COPY scripts/start.sh /usr/local/bin/start.sh
 
 # The wrapper listens on $PORT.
 # IMPORTANT: Do not set a default PORT here.
@@ -112,6 +130,6 @@ COPY src ./src
 # If we force a different port, deployments can come up but the domain will route elsewhere.
 EXPOSE 8080
 
-# Ensure PID 1 reaps zombies and forwards signals.
-ENTRYPOINT ["tini", "--"]
-CMD ["node", "src/server.js"]
+# Ensure PID 1 reaps zombies and forwards signals (-g = group forwarding).
+ENTRYPOINT ["tini", "-g", "--"]
+CMD ["/usr/local/bin/start.sh"]
