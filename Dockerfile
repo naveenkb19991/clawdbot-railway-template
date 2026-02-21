@@ -48,20 +48,27 @@ RUN apt-get update \
     ca-certificates \
     tini \
     python3 \
+    python3-pip \
     python3-venv \
     gpg \
     curl \
+    jq \
+    tmux \
   && mkdir -p /etc/apt/keyrings \
   && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     | gpg --dearmor -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
     > /etc/apt/sources.list.d/github-cli.list \
   && apt-get update \
-  && apt-get install -y --no-install-recommends gh jq tmux \
+  && apt-get install -y --no-install-recommends gh \
   && rm -rf /var/lib/apt/lists/*
 
-# Install OpenCode CLI
+# Install uv (Python package manager)
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+
+# Install OpenCode CLI (installs to /root/.opencode/bin, add to PATH explicitly)
 RUN curl -fsSL https://opencode.ai/install | bash
+ENV PATH="/root/.opencode/bin:${PATH}"
 
 # `openclaw update` expects pnpm. Provide it in the runtime image.
 RUN corepack enable && corepack prepare pnpm@10.23.0 --activate
@@ -73,7 +80,10 @@ ENV NPM_CONFIG_PREFIX=/data/npm
 ENV NPM_CONFIG_CACHE=/data/npm-cache
 ENV PNPM_HOME=/data/pnpm
 ENV PNPM_STORE_DIR=/data/pnpm-store
-ENV PATH="/data/npm/bin:/data/pnpm:${PATH}"
+
+# Persistent Python venv on Railway volume
+ENV VIRTUAL_ENV=/data/venv
+ENV PATH="/data/venv/bin:/data/npm/bin:/data/pnpm:${PATH}"
 
 WORKDIR /app
 
